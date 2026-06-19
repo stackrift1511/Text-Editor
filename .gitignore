@@ -1,0 +1,8 @@
+# compiled binary
+editor
+*.o
+*.out
+
+# editor/OS junk
+.vscode/
+*.swp
