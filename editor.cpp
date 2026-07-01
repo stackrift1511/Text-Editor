@@ -20,8 +20,21 @@ private:
     struct termios orig_termios;
 };
 
+void readInput(){
+    while(true){
+        char c;
+        read(STDIN_FILENO, &c, 1);
+        if(c=='q'){
+            break;
+        }
+        std::cout << "key: " << (int)c << " ('" << c << "')\r\n";
+        
+    }
+}
+
 int main() {
     Terminal term;
+    readInput();
     std::cout << "Editor starting...\n";
     return 0;
 }
