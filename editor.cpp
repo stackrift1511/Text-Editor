@@ -1,6 +1,10 @@
 #include <iostream>
 #include <termios.h>
 #include <unistd.h>
+#include <cstdio>
+#include <cstring>
+
+int cx=0, cy=0;
 
 class Terminal {
 public:
@@ -31,6 +35,9 @@ void refreshScreen(){
     write(STDOUT_FILENO, "\x1b[H", 3);  // cursor to top-left
     drawRows();
     write(STDOUT_FILENO, "\x1b[H", 3);  // cursor to top-left again
+    char buf[32];
+    snprintf(buf, sizeof(buf), "\x1b[%d;%dH", cy + 1, cx + 1);
+    write(STDOUT_FILENO, buf, strlen(buf));
 }
 
 
@@ -45,7 +52,27 @@ void readInput(){
             write(STDOUT_FILENO, "\x1b[H", 3);
             break;
         }
-        std::cout << "key: " << (int)c << " ('" << c << "')\r\n";
+        else if (c == '\x1b') {
+            char seq[2];
+            read(STDIN_FILENO, &seq[0], 1); // read '['
+            read(STDIN_FILENO, &seq[1], 1); // read A/B/C/D
+            if (seq[0] == '[') {
+                    switch (seq[1]) 
+                    {
+                        // cy is the row, and row 0 is at the top. So moving up means decreasing cy, moving down means increasing it
+                        case 'A': if(cy > 0) cy--; 
+                              break; // up
+                        case 'B': if(cy < 23 )cy++;
+                              break;// down
+                        case 'C': if(cx < 79) cx++;
+                              break;// right
+                        case 'D': if(cx > 0) cx--;
+                              break;// left
+                        //We're hardcoding 24 rows and 80 columns for now — we'll make these dynamic when we query the actual terminal size later.
+                    }
+            }
+        }
+        
         
     }
 }
