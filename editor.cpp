@@ -11,6 +11,7 @@
 struct EditorConfig {
     int cx, cy;
     int rows, cols;
+    int rowoff; // row offset - how far we've scrolled.
     std::vector<std::string> lines; //file contents
 };
 EditorConfig E;
@@ -33,6 +34,15 @@ private:
     struct termios orig_termios;
 };
 
+void scroll(){
+    //if cursor is above visible area, scroll up
+    if(E.cy < E.rowoff)
+        E.rowoff = E.cy;
+    //if cursor is below visible area, scroll down 
+    if(E.cy >= E.rowoff + E.rows)
+        E.rowoff = E.cy - E.rows + 1;
+}
+
 void loadFile(const char* filename){
     std::ifstream file(filename); //opens the file - different name from parameter
     std::string line;
@@ -45,18 +55,17 @@ void initEditor(){
     struct winsize ws;
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
     E.rows = ws.ws_row, E.cols = ws.ws_col;
-    E.cx=0, E.cy=0;
+    E.cx=0, E.cy=0, E.rowoff=0;
 }
 
 void drawRows(){
     for(int i=0; i<E.rows; i++){
-        if(i < (int)E.lines.size()){
-            // line exists — write it, truncated to terminal width
-            int len = E.lines[i].size();
+        int filerow = i + E.rowoff;
+        if(filerow < (int)E.lines.size()){
+            int len = E.lines[filerow].size();
             if(len > E.cols) len = E.cols;
-            write(STDOUT_FILENO, E.lines[i].c_str(), len);
+            write(STDOUT_FILENO, E.lines[filerow].c_str(), len);
         } else {
-            // no line here — draw tilde
             write(STDOUT_FILENO, "~", 1);
         }
         write(STDOUT_FILENO, "\r\n", 2);
@@ -64,12 +73,13 @@ void drawRows(){
 }
 
 void refreshScreen(){
+    scroll();
     write(STDOUT_FILENO, "\x1b[2J", 4); // clear screen
     write(STDOUT_FILENO, "\x1b[H", 3);  // cursor to top-left
     drawRows();
     write(STDOUT_FILENO, "\x1b[H", 3);  // cursor to top-left again
     char buf[32];
-    snprintf(buf, sizeof(buf), "\x1b[%d;%dH", E.cy + 1, E.cx + 1);
+    snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (E.cy - E.rowoff) + 1, E.cx + 1);
     write(STDOUT_FILENO, buf, strlen(buf));
 }
 
@@ -95,7 +105,7 @@ void readInput(){
                         // cy is the row, and row 0 is at the top. So moving up means decreasing cy, moving down means increasing it
                         case 'A': if(E.cy > 0) E.cy--; 
                               break; // up
-                        case 'B': if(E.cy < E.rows - 1 ) E.cy++;
+                        case 'B': if(E.cy < (int)E.lines.size() - 1 ) E.cy++;
                               break;// down
                         case 'C': if(E.cx < E.cols - 1) E.cx++;
                               break;// right
