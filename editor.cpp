@@ -2,12 +2,16 @@
 #include <termios.h>
 #include <unistd.h>
 #include <cstdio>
+#include <fstream>
+#include <vector>
+#include <string>
 #include <cstring>
 #include <sys/ioctl.h>
 
 struct EditorConfig {
     int cx, cy;
     int rows, cols;
+    std::vector<std::string> lines; //file contents
 };
 EditorConfig E;
 
@@ -29,6 +33,14 @@ private:
     struct termios orig_termios;
 };
 
+void loadFile(const char* filename){
+    std::ifstream file(filename); //opens the file - different name from parameter
+    std::string line;
+    while(std::getline(file, line)) { //read one line at a time
+        E.lines.push_back(line); //add it to the vector
+    }
+}
+
 void initEditor(){
     struct winsize ws;
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
@@ -37,8 +49,17 @@ void initEditor(){
 }
 
 void drawRows(){
-    for(int i=1; i<=E.rows; i++){
-        write(STDOUT_FILENO, "~\r\n", 3);
+    for(int i=0; i<E.rows; i++){
+        if(i < (int)E.lines.size()){
+            // line exists — write it, truncated to terminal width
+            int len = E.lines[i].size();
+            if(len > E.cols) len = E.cols;
+            write(STDOUT_FILENO, E.lines[i].c_str(), len);
+        } else {
+            // no line here — draw tilde
+            write(STDOUT_FILENO, "~", 1);
+        }
+        write(STDOUT_FILENO, "\r\n", 2);
     }
 }
 
@@ -88,10 +109,10 @@ void readInput(){
     }
 }
 
-int main() {
+int main(int argc, char* argv[]) {
     Terminal term;
     initEditor();
+    if (argc >= 2 ) loadFile(argv[1]);
     readInput();
-    std::cout << "Editor starting...\n";
     return 0;
 }
